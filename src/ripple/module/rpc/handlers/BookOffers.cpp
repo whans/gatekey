@@ -19,6 +19,9 @@
 
 namespace ripple {
 
+static void getBookPageAll (RPC::Context& context,
+                    const unsigned int iLimit, Json::Value& jvResult);
+
 Json::Value doBookOffers (RPC::Context& context)
 {
     // VFALCO TODO Here is a terrible place for this kind of business
@@ -33,6 +36,14 @@ Json::Value doBookOffers (RPC::Context& context)
 
     if (!lpLedger)
         return jvResult;
+
+    if (context.params_.isMember("all_books"))
+    {
+        unsigned int book_sizes = context.params_["all_books"].asUInt();
+        WriteLog (lsINFO, RPCHandler) << "whans process all book size: " << book_sizes;
+        getBookPageAll (context, book_sizes, jvResult);
+        return jvResult;
+    }
 
     if (!context.params_.isMember ("taker_pays"))
         return RPC::missing_field_error ("taker_pays");
@@ -186,6 +197,41 @@ Json::Value doBookOffers (RPC::Context& context)
     context.loadType_ = Resource::feeMediumBurdenRPC;
 
     return jvResult;
+}
+
+static void getBookPageAll (RPC::Context& context, const unsigned int iLimit, Json::Value& jvResult)
+{
+    OrderBookDB::IssueToOrderBook sourceMap = getApp().getOrderBookDB ().getOrderBookSourceMap();
+    OrderBookDB::IssueToOrderBook::iterator srcIt = sourceMap.begin();
+    Book book;
+    int count = 0;
+    auto lpLedger = getApp().getLedgerMaster ().getPublishedLedger ();
+    if (!lpLedger)
+        return;
+
+    const Json::Value jvMarker = Json::Value (Json::nullValue);
+    jvResult[jss::offers] = Json::Value (Json::arrayValue);
+
+    RippleAddress   raTakerID;
+    raTakerID.setAccountID (noAccount());
+
+    for (; srcIt != sourceMap.end(); ++srcIt)
+    {
+        for (auto ob : srcIt->second)
+        {
+            Json::Value jvOffer  = Json::Value (Json::nullValue);
+            WriteLog (lsWARNING, RPCHandler) << "in for getBookPageAll whans book: " << ob->book();
+            context.netOps_.getBookPage (
+                lpLedger, ob->book(), raTakerID.getAccountID (), false, iLimit,
+                jvMarker, jvOffer);
+            for (auto of : jvOffer[jss::offers])
+                jvResult[jss::offers].append(of);
+//            jvResult[jss::offers].append(jvOffer[jss::offers]);
+            count++;
+        }
+    }
+    WriteLog (lsWARNING, RPCHandler) << "getBookPageALl whans book sizes: " << count;
+
 }
 
 } // ripple

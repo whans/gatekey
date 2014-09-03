@@ -57,6 +57,8 @@ public:
 
     typedef hash_map <Issue, OrderBook::List> IssueToOrderBook;
 
+    IssueToOrderBook const& getOrderBookSourceMap();
+
 private:
     void rawAddBook(Book const&);
 

@@ -269,4 +269,9 @@ void OrderBookDB::processTxn (
     }
 }
 
+OrderBookDB::IssueToOrderBook const& OrderBookDB::getOrderBookSourceMap()
+{
+    return mSourceMap;
+}
+
 } // ripple

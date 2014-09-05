@@ -342,6 +342,13 @@ static void getBookPageByMap (RPC::Context& context,
             raTakerID.getAccountID (), false, iLimit, jvMarker, jvOffer);
 
         jvResult[jss::offers].append(jvOffer[jss::offers]);
+
+        context.netOps_.getBookPage (
+            lpLedger,
+            {{get_currency, get_issuer}, {pay_currency, pay_issuer}},
+            raTakerID.getAccountID (), false, iLimit, jvMarker, jvOffer);
+
+        jvResult[jss::offers].append(jvOffer[jss::offers]);
     }
 }
 

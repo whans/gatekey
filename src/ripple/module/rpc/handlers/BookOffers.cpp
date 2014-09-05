@@ -23,6 +23,10 @@ static void getBookPageAll (RPC::Context& context,
                     const unsigned int all_book, Json::Value& jvResult,
                     const unsigned int iLimit);
 
+static void getBookPageByMap (RPC::Context& context,
+                    Json::Value& jvResult,
+                    const unsigned int iLimit);
+
 Json::Value doBookOffers (RPC::Context& context)
 {
     // VFALCO TODO Here is a terrible place for this kind of business
@@ -53,6 +57,17 @@ Json::Value doBookOffers (RPC::Context& context)
         Currency dst_currency;
         WriteLog (lsINFO, RPCHandler) << "whans process all book size";
         getBookPageAll (context, all_book, jvResult, iLimit);
+        return jvResult;
+    }
+
+    if (context.params_.isMember("map_pays"))
+    {
+        unsigned int const iLimit (context.params_.isMember ("limit")
+            ? context.params_ ["limit"].asUInt ()
+            : 0);
+
+        WriteLog (lsWARNING, RPCHandler) << "whans process getBookPageByMap";
+        getBookPageByMap (context, jvResult, iLimit);
         return jvResult;
     }
 
@@ -281,6 +296,53 @@ static void getBookPageAll (RPC::Context& context,
     }
     WriteLog (lsWARNING, RPCHandler) << "getBookPageALl whans book sizes: ";
 
+}
+
+static void getBookPageByMap (RPC::Context& context,
+                    Json::Value& jvResult,
+                    const unsigned int iLimit)
+{
+    auto lpLedger = getApp().getLedgerMaster ().getPublishedLedger ();
+    if (!lpLedger)
+        return;
+
+    const Json::Value jvMarker = Json::Value (Json::nullValue);
+    jvResult[jss::offers] = Json::Value (Json::arrayValue);
+
+    Account pay_issuer;
+    Account get_issuer;
+    Currency pay_currency;
+    Currency get_currency;
+    RippleAddress   raTakerID;
+    raTakerID.setAccountID (noAccount());
+
+    for (auto& it1: context.params_["map_pays"])
+    {
+        WriteLog (lsWARNING, RPCHandler) << "whans in getBookPageByMap for";
+        int count = 0;
+        Json::Value jvOffer  = Json::Value (Json::nullValue);
+        for (auto& it2: it1)
+        {
+            if (count == 0)
+                to_currency(pay_currency, it2.asString());
+            if (count == 1)
+                to_issuer(pay_issuer, it2.asString());
+            if (count == 2)
+                to_currency(get_currency, it2.asString());
+            if (count == 3)
+                to_issuer(get_issuer, it2.asString());
+            count++;
+        }
+
+        WriteLog (lsWARNING, RPCHandler) << "whans in getBookPageByMap map: " << pay_currency
+                        << "/" << pay_issuer << "," << get_currency << "/"<<get_issuer;
+        context.netOps_.getBookPage (
+            lpLedger,
+            {{pay_currency, pay_issuer}, {get_currency, get_issuer}},
+            raTakerID.getAccountID (), false, iLimit, jvMarker, jvOffer);
+
+        jvResult[jss::offers].append(jvOffer[jss::offers]);
+    }
 }
 
 } // ripple

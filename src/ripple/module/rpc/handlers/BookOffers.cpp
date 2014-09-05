@@ -20,7 +20,8 @@
 namespace ripple {
 
 static void getBookPageAll (RPC::Context& context,
-                    const unsigned int iLimit, Json::Value& jvResult);
+                    const unsigned int all_book, Json::Value& jvResult,
+                    const unsigned int iLimit);
 
 Json::Value doBookOffers (RPC::Context& context)
 {
@@ -37,11 +38,21 @@ Json::Value doBookOffers (RPC::Context& context)
     if (!lpLedger)
         return jvResult;
 
-    if (context.params_.isMember("all_books"))
+    if (context.params_.isMember("currencies"))
     {
-        unsigned int book_sizes = context.params_["all_books"].asUInt();
-        WriteLog (lsINFO, RPCHandler) << "whans process all book size: " << book_sizes;
-        getBookPageAll (context, book_sizes, jvResult);
+
+        unsigned int const all_book (context.params_.isMember ("all_book")
+            ? context.params_ ["all_book"].asUInt ()
+            : 0);
+
+        unsigned int const iLimit (context.params_.isMember ("limit")
+            ? context.params_ ["limit"].asUInt ()
+            : 0);
+
+        Currency src_currency;
+        Currency dst_currency;
+        WriteLog (lsINFO, RPCHandler) << "whans process all book size";
+        getBookPageAll (context, all_book, jvResult, iLimit);
         return jvResult;
     }
 
@@ -199,12 +210,13 @@ Json::Value doBookOffers (RPC::Context& context)
     return jvResult;
 }
 
-static void getBookPageAll (RPC::Context& context, const unsigned int iLimit, Json::Value& jvResult)
+static void getBookPageAll (RPC::Context& context,
+                    const unsigned int all_book, Json::Value& jvResult,
+                    const unsigned int iLimit)
+//static void getBookPageAll (RPC::Context& context, const unsigned int iLimit, Json::Value& jvResult)
 {
     OrderBookDB::IssueToOrderBook sourceMap = getApp().getOrderBookDB ().getOrderBookSourceMap();
     OrderBookDB::IssueToOrderBook::iterator srcIt = sourceMap.begin();
-    Book book;
-    int count = 0;
     auto lpLedger = getApp().getLedgerMaster ().getPublishedLedger ();
     if (!lpLedger)
         return;
@@ -215,22 +227,59 @@ static void getBookPageAll (RPC::Context& context, const unsigned int iLimit, Js
     RippleAddress   raTakerID;
     raTakerID.setAccountID (noAccount());
 
+    Currency src_currency;
+    Currency dst_currency;
+    std::string currency_1;
+    std::string currency_2;
+
     for (; srcIt != sourceMap.end(); ++srcIt)
     {
         for (auto ob : srcIt->second)
         {
             Json::Value jvOffer  = Json::Value (Json::nullValue);
             WriteLog (lsWARNING, RPCHandler) << "in for getBookPageAll whans book: " << ob->book();
-            context.netOps_.getBookPage (
-                lpLedger, ob->book(), raTakerID.getAccountID (), false, iLimit,
-                jvMarker, jvOffer);
-            for (auto of : jvOffer[jss::offers])
-                jvResult[jss::offers].append(of);
-//            jvResult[jss::offers].append(jvOffer[jss::offers]);
-            count++;
+
+            if (!all_book)
+            {
+                for (auto& it1: context.params_["currencies"])
+                {
+                    for (auto& it2: context.params_["currencies"])
+                    {
+                        currency_1 = it1.asString ();
+                        currency_2 = it2.asString ();
+
+                        if (!to_currency (src_currency, currency_1))
+                        {
+                            WriteLog (lsINFO, RPCHandler) << "whans Bad src currency.";
+                        }
+
+                        if (!to_currency (dst_currency, currency_2))
+                        {
+                            WriteLog (lsINFO, RPCHandler) << "whans Bad src currency.";
+                        }
+                        if(ob->book().in.currency == src_currency
+                            && ob->book().out.currency == dst_currency)
+                        {
+                            context.netOps_.getBookPage (
+                                lpLedger, ob->book(), raTakerID.getAccountID (), false, iLimit,
+                                jvMarker, jvOffer);
+                            jvResult[jss::offers].append(jvOffer[jss::offers]);
+                        }
+
+                    }
+                }
+            }
+            else
+            {
+                context.netOps_.getBookPage (
+                    lpLedger, ob->book(), raTakerID.getAccountID (), false, iLimit,
+                    jvMarker, jvOffer);
+                jvResult[jss::offers].append(jvOffer[jss::offers]);
+            }
+
         }
     }
-    WriteLog (lsWARNING, RPCHandler) << "getBookPageALl whans book sizes: " << count;
+    WriteLog (lsWARNING, RPCHandler) << "getBookPageALl whans book sizes: ";
 
 }
 

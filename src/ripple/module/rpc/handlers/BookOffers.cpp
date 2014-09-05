@@ -319,36 +319,37 @@ static void getBookPageByMap (RPC::Context& context,
     for (auto& it1: context.params_["map_pays"])
     {
         WriteLog (lsWARNING, RPCHandler) << "whans in getBookPageByMap for";
-        int count = 0;
-        Json::Value jvOffer  = Json::Value (Json::nullValue);
-        for (auto& it2: it1)
+        int count1 = 0;
+        for (auto& tmp: it1)
         {
-            if (count == 0)
-                to_currency(pay_currency, it2.asString());
-            if (count == 1)
-                to_issuer(pay_issuer, it2.asString());
-            if (count == 2)
-                to_currency(get_currency, it2.asString());
-            if (count == 3)
-                to_issuer(get_issuer, it2.asString());
-            count++;
+            if (count1 == 0)
+                to_currency(pay_currency, tmp.asString());
+            if (count1 == 1)
+                to_issuer(pay_issuer, tmp.asString());
+            count1++;
         }
+        for (auto& it2: context.params_["map_pays"])
+        {
+            Json::Value jvOffer  = Json::Value (Json::nullValue);
+            int count2 = 0;
+            for (auto& tmp: it2)
+            {
+                if (count2 == 0)
+                    to_currency(get_currency, tmp.asString());
+                if (count2 == 1)
+                    to_issuer(get_issuer, tmp.asString());
+                count2++;
+            }
+            WriteLog (lsWARNING, RPCHandler) << "whans in getBookPageByMap map: " << pay_currency
+                            << "/" << pay_issuer << "," << get_currency << "/"<<get_issuer;
+            context.netOps_.getBookPage (
+                lpLedger,
+                {{pay_currency, pay_issuer}, {get_currency, get_issuer}},
+                raTakerID.getAccountID (), false, iLimit, jvMarker, jvOffer);
 
-        WriteLog (lsWARNING, RPCHandler) << "whans in getBookPageByMap map: " << pay_currency
-                        << "/" << pay_issuer << "," << get_currency << "/"<<get_issuer;
-        context.netOps_.getBookPage (
-            lpLedger,
-            {{pay_currency, pay_issuer}, {get_currency, get_issuer}},
-            raTakerID.getAccountID (), false, iLimit, jvMarker, jvOffer);
+            jvResult[jss::offers].append(jvOffer[jss::offers]);
 
-        jvResult[jss::offers].append(jvOffer[jss::offers]);
-
-        context.netOps_.getBookPage (
-            lpLedger,
-            {{get_currency, get_issuer}, {pay_currency, pay_issuer}},
-            raTakerID.getAccountID (), false, iLimit, jvMarker, jvOffer);
-
-        jvResult[jss::offers].append(jvOffer[jss::offers]);
+        }
     }
 }
 

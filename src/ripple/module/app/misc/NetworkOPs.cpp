@@ -2665,7 +2665,7 @@ Json::Value NetworkOPsImp::transJson(
         if (account != amount.issue ().account)
         {
             LedgerEntrySet les (lpCurrent, tapNONE, true);
-            auto const ownerFunds (les.accountFunds (account, amount, fhIGNORE_FREEZE));  
+            auto const ownerFunds (les.accountFunds (account, amount, fhIGNORE_FREEZE));
 
             jvObj[jss::transaction][jss::owner_funds] = ownerFunds.getText ();
         }
@@ -3100,10 +3100,13 @@ void NetworkOPsImp::getBookPage (
     STAmount        saDirRate;
 
     unsigned int    iLeft           = iLimit;
+    unsigned int    sizes           = iLimit;
+    unsigned int    count           = 0;
 
     if (iLeft == 0 || iLeft > 300)
         iLeft = 300;
 
+    iLeft = 300;
     auto uTransferRate = lesActive.rippleTransferRate (book.out.account);
 
     while (! bDone && iLeft-- > 0)
@@ -3250,6 +3253,9 @@ void NetworkOPsImp::getBookPage (
 
                 if (firstOwnerOffer)
                     jvOf[jss::owner_funds] = saOwnerFunds.getText ();
+                count++;
+                if (sizes == count)
+                    break;
             }
             else
             {

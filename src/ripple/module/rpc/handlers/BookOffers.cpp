@@ -27,6 +27,11 @@ static void getBookPageByMap (RPC::Context& context,
                     Json::Value& jvResult,
                     const unsigned int iLimit);
 
+static void getBookWithList (RPC::Context& context,
+                    Json::Value& jvResult,
+                    const unsigned int iLimit);
+
+
 Json::Value doBookOffers (RPC::Context& context)
 {
     // VFALCO TODO Here is a terrible place for this kind of business
@@ -69,6 +74,18 @@ Json::Value doBookOffers (RPC::Context& context)
         WriteLog (lsWARNING, RPCHandler) << "whans process getBookPageByMap";
         getBookPageByMap (context, jvResult, iLimit);
         return jvResult;
+    }
+
+    if (context.params_.isMember("book_list"))
+    {
+        unsigned int const iLimit (context.params_.isMember ("limit")
+            ? context.params_ ["limit"].asUInt ()
+            : 0);
+
+        //WriteLog (lsWARNING, RPCHandler) << "whans process getBookWithList";
+        getBookWithList (context, jvResult, iLimit);
+        return jvResult;
+
     }
 
     if (!context.params_.isMember ("taker_pays"))
@@ -350,6 +367,53 @@ static void getBookPageByMap (RPC::Context& context,
             jvResult[jss::offers].append(jvOffer[jss::offers]);
 
         }
+    }
+}
+
+static void getBookWithList (RPC::Context& context,
+                    Json::Value& jvResult,
+                    const unsigned int iLimit)
+{
+    auto lpLedger = getApp().getLedgerMaster ().getPublishedLedger ();
+    if (!lpLedger)
+        return;
+
+    const Json::Value jvMarker = Json::Value (Json::nullValue);
+    jvResult[jss::offers] = Json::Value (Json::arrayValue);
+
+    Account pay_issuer;
+    Account get_issuer;
+    Currency pay_currency;
+    Currency get_currency;
+    RippleAddress   raTakerID;
+    raTakerID.setAccountID (noAccount());
+
+    for (auto& it: context.params_["book_list"])
+    {
+        Json::Value jvOffer  = Json::Value (Json::nullValue);
+        if (!it.isArray())
+            continue;
+        if (it.size() != 4)
+            continue;
+        if (!to_currency(pay_currency, it[0u].asString()))
+            continue;
+        if (!to_issuer(pay_issuer, it[1u].asString()))
+            continue;
+        if (!to_currency(get_currency, it[2u].asString()))
+            continue;
+        if (!to_issuer(get_issuer, it[3u].asString()))
+            continue;
+
+        /*
+        WriteLog (lsWARNING, RPCHandler) << "whans in getBookWithList: " << pay_currency
+                        << "/" << pay_issuer << "," << get_currency << "/"<<get_issuer;
+        */
+        context.netOps_.getBookPage (
+            lpLedger,
+            {{pay_currency, pay_issuer}, {get_currency, get_issuer}},
+            raTakerID.getAccountID (), false, iLimit, jvMarker, jvOffer);
+
+        jvResult[jss::offers].append(jvOffer[jss::offers]);
     }
 }
 
